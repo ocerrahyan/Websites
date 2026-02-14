@@ -45,6 +45,7 @@ main {
     max-width: 800px;
     margin: 20px auto;
     padding: 20px;
+    padding-bottom: 60px; /* Add space for footer */
     background: #ffffff;
     border-radius: 5px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -64,7 +65,5 @@ footer {
     color: #ffffff;
     text-align: center;
     padding: 10px 0;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
+    margin-top: 20px;
 }
