@@ -1,0 +1,19 @@
+# Replit runtime files (keep .replit and replit.nix in repo)
+.config/
+.upm/
+.cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+.tmp/
