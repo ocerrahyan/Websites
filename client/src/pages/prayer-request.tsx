@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
+import { saveAdminPrayerRequest } from "@/lib/prayer-storage";
+import { logVisitorAction } from "@/lib/activity-logger";
 import { ArrowLeft, Heart, Lock, HandHeart, ShieldCheck } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -45,14 +47,10 @@ export default function PrayerRequest() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/prayer-requests", {
-        name,
-        email: email || null,
-        phone: phone || null,
-        content,
-        isRead: false,
-      });
-      return res.json();
+      // Save to PHP API for cross-device access
+      await saveAdminPrayerRequest({ name, email, phone, content });
+      logVisitorAction("prayer_request_submitted", { name, hasEmail: !!email }, "prayer");
+      return { ok: true };
     },
     onSuccess: () => {
       setSubmitted(true);

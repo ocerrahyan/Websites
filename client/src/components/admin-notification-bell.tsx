@@ -5,6 +5,8 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useState, useEffect } from "react";
+import { getAdminNotifications, markAdminNotificationRead, markAllAdminNotificationsRead, getUnreadAdminNotifCount, type AdminLocalNotification } from "@/lib/prayer-storage";
 import type { AdminNotification } from "@shared/schema";
 
 const typeIcons: Record<string, typeof Heart> = {
@@ -44,6 +46,20 @@ export function AdminNotificationBell() {
     queryKey: ["/api/notifications"],
   });
 
+  // Local notification fallback for static hosting
+  const [localNotifs, setLocalNotifs] = useState<AdminLocalNotification[]>([]);
+  const [localUnread, setLocalUnread] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => {
+      setLocalNotifs(getAdminNotifications());
+      setLocalUnread(getUnreadAdminNotifCount());
+    };
+    refresh();
+    const interval = setInterval(refresh, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   const markReadMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("PATCH", `/api/notifications/${id}/read`);
@@ -64,8 +80,25 @@ export function AdminNotificationBell() {
     },
   });
 
-  const unreadCount = countData?.count || 0;
-  const displayedNotifications = notifications?.slice(0, 20) || [];
+  // Merge API + local: use API if available, otherwise local
+  const apiCount = countData?.count || 0;
+  const unreadCount = apiCount > 0 ? apiCount : localUnread;
+  const apiNotifs = notifications?.slice(0, 20) || [];
+  const displayedNotifications = apiNotifs.length > 0 ? apiNotifs : localNotifs.slice(0, 20);
+
+  const handleMarkRead = (id: string) => {
+    markReadMutation.mutate(id);
+    markAdminNotificationRead(id);
+    setLocalNotifs(getAdminNotifications());
+    setLocalUnread(getUnreadAdminNotifCount());
+  };
+
+  const handleMarkAllRead = () => {
+    markAllReadMutation.mutate();
+    markAllAdminNotificationsRead();
+    setLocalNotifs(getAdminNotifications());
+    setLocalUnread(0);
+  };
 
   return (
     <Popover>
@@ -90,8 +123,7 @@ export function AdminNotificationBell() {
               variant="ghost"
               size="sm"
               className="text-xs"
-              onClick={() => markAllReadMutation.mutate()}
-              disabled={markAllReadMutation.isPending}
+              onClick={() => handleMarkAllRead()}
               data-testid="button-mark-all-read"
             >
               Mark All Read
@@ -114,7 +146,7 @@ export function AdminNotificationBell() {
                     !notif.isRead ? "bg-muted/30" : ""
                   }`}
                   onClick={() => {
-                    if (!notif.isRead) markReadMutation.mutate(notif.id);
+                    if (!notif.isRead) handleMarkRead(notif.id as string);
                   }}
                   data-testid={`notification-${notif.id}`}
                 >

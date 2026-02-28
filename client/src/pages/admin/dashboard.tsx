@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { fetchAllAppointments, type PHPAppointment } from "@/lib/appointment-storage";
 import type { Client, Appointment, Service, Product } from "@shared/schema";
 import {
   SidebarProvider,
@@ -31,10 +32,24 @@ function DashboardContent() {
   const { data: birthdays, isLoading: birthdaysLoading } = useQuery<BirthdayClient[]>({ queryKey: ["/api/clients/upcoming-birthdays"] });
   const { data: pendingReminders, isLoading: remindersLoading } = useQuery<Appointment[]>({ queryKey: ["/api/reminders/pending"] });
   const { data: pendingFollowups, isLoading: followupsLoading } = useQuery<Appointment[]>({ queryKey: ["/api/followups/pending"] });
+  const [phpAppointments, setPhpAppointments] = useState<PHPAppointment[]>([]);
   const { logout } = useAuth();
   const { toast } = useToast();
   const [generatingBirthday, setGeneratingBirthday] = useState<string | null>(null);
   const [generatingFollowup, setGeneratingFollowup] = useState<string | null>(null);
+
+  // Fetch PHP appointments
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await fetchAllAppointments();
+        setPhpAppointments(data);
+      } catch { /* ignore */ }
+    };
+    load();
+    const interval = setInterval(load, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const markReminded = useMutation({
     mutationFn: async (id: string) => {
@@ -90,6 +105,10 @@ function DashboardContent() {
   const today = new Date().toISOString().split("T")[0];
   const todayAppointments = appointments?.filter((a) => a.date === today) || [];
   const pendingAppointments = appointments?.filter((a) => a.status === "pending") || [];
+  // PHP appointments for today and pending
+  const todayPhpAppts = phpAppointments.filter((a) => a.date === today);
+  const pendingPhpAppts = phpAppointments.filter((a) => a.status === "pending");
+  const totalTodayAppts = todayAppointments.length + todayPhpAppts.length;
 
   const stats = [
     {
@@ -101,7 +120,7 @@ function DashboardContent() {
     },
     {
       label: "Today's Appointments",
-      value: todayAppointments.length,
+      value: totalTodayAppts,
       icon: Calendar,
       color: "text-green-500",
       bg: "bg-green-500/10",
@@ -177,7 +196,7 @@ function DashboardContent() {
                     <Skeleton key={i} className="h-16 rounded-md" />
                   ))}
                 </div>
-              ) : todayAppointments.length === 0 ? (
+              ) : totalTodayAppts === 0 ? (
                 <div className="text-center py-8">
                   <Calendar className="w-10 h-10 text-muted-foreground/50 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">No appointments scheduled for today</p>
@@ -207,6 +226,26 @@ function DashboardContent() {
                       </div>
                     );
                   })}
+                  {todayPhpAppts.slice(0, 5).map((appt) => (
+                    <div key={appt.id} className="flex items-center justify-between gap-3 p-3 rounded-md bg-muted/50" data-testid={`appointment-${appt.id}`}>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {appt.firstName} {appt.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {appt.serviceName} - {appt.startTime}
+                        </p>
+                        {appt.email && <p className="text-xs text-muted-foreground">{appt.email}</p>}
+                      </div>
+                      <Badge variant={
+                        appt.status === "confirmed" ? "default" :
+                        appt.status === "completed" ? "secondary" :
+                        appt.status === "cancelled" ? "destructive" : "outline"
+                      }>
+                        {appt.status}
+                      </Badge>
+                    </div>
+                  ))}
                 </div>
               )}
             </Card>

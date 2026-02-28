@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,22 +14,47 @@ import {
 } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin-sidebar";
 import {
-  ChevronLeft, ChevronRight, LogOut, Check, X, Clock,
+  ChevronLeft, ChevronRight, LogOut, Check, X, Clock, RefreshCw,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { fetchAllAppointments, updateAppointmentStatus, type PHPAppointment } from "@/lib/appointment-storage";
 import type { Appointment, Client, Service } from "@shared/schema";
 import { format, addDays, startOfWeek, isSameDay, parseISO } from "date-fns";
 
 function CalendarContent() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"week" | "day">("week");
+  const [phpAppointments, setPhpAppointments] = useState<PHPAppointment[]>([]);
+  const [isLoadingPHP, setIsLoadingPHP] = useState(true);
   const { logout } = useAuth();
   const { toast } = useToast();
 
   const { data: appointments, isLoading } = useQuery<Appointment[]>({ queryKey: ["/api/appointments"] });
   const { data: clients } = useQuery<Client[]>({ queryKey: ["/api/clients"] });
   const { data: services } = useQuery<Service[]>({ queryKey: ["/api/services"] });
+
+  // Fetch PHP appointments
+  const loadPHPAppointments = async () => {
+    setIsLoadingPHP(true);
+    try {
+      const data = await fetchAllAppointments();
+      setPhpAppointments(data);
+    } catch { /* ignore */ }
+    setIsLoadingPHP(false);
+  };
+
+  useEffect(() => {
+    loadPHPAppointments();
+    const interval = setInterval(loadPHPAppointments, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleStatusUpdate = async (id: string, status: string) => {
+    await updateAppointmentStatus(id, status);
+    toast({ title: "Appointment updated" });
+    loadPHPAppointments();
+  };
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -47,7 +72,15 @@ function CalendarContent() {
 
   const getAppointmentsForDay = (date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
-    return appointments?.filter((a) => a.date === dateStr) || [];
+    // Merge API appointments + PHP appointments
+    const apiAppts = appointments?.filter((a) => a.date === dateStr) || [];
+    const phpAppts = phpAppointments.filter((a) => a.date === dateStr);
+    return { apiAppts, phpAppts };
+  };
+
+  const getTotalForDay = (date: Date) => {
+    const { apiAppts, phpAppts } = getAppointmentsForDay(date);
+    return apiAppts.length + phpAppts.length;
   };
 
   const hours = Array.from({ length: 11 }, (_, i) => i + 8);
@@ -104,6 +137,9 @@ function CalendarContent() {
             <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} data-testid="button-today">
               Today
             </Button>
+            <Button variant="outline" size="sm" onClick={loadPHPAppointments} title="Refresh appointments">
+              <RefreshCw className="w-4 h-4" />
+            </Button>
             <Select value={view} onValueChange={(v: "week" | "day") => setView(v)}>
               <SelectTrigger className="w-[100px]" data-testid="select-view">
                 <SelectValue />
@@ -116,7 +152,7 @@ function CalendarContent() {
           </div>
         </div>
 
-        {isLoading ? (
+        {isLoading && isLoadingPHP ? (
           <Skeleton className="h-[500px] rounded-md" />
         ) : view === "week" ? (
           <Card className="p-0 overflow-auto">
@@ -140,7 +176,7 @@ function CalendarContent() {
                     {format(day, "d")}
                   </p>
                   <Badge variant="secondary" className="mt-1">
-                    {getAppointmentsForDay(day).length}
+                    {getTotalForDay(day)}
                   </Badge>
                 </div>
               ))}
@@ -150,15 +186,21 @@ function CalendarContent() {
                     {hour > 12 ? `${hour - 12} PM` : hour === 12 ? "12 PM" : `${hour} AM`}
                   </div>
                   {weekDays.map((day) => {
-                    const dayAppts = getAppointmentsForDay(day).filter((a) => {
-                      const h = parseInt(a.startTime.split(":")[0]);
-                      const isPM = a.startTime.includes("PM");
-                      const hour24 = isPM && h !== 12 ? h + 12 : !isPM && h === 12 ? 0 : h;
-                      return hour24 === hour;
-                    });
+                    const { apiAppts, phpAppts } = getAppointmentsForDay(day);
+
+                    // Parse time to 24h for filtering
+                    const parseHour = (t: string) => {
+                      const h = parseInt(t.split(":")[0]);
+                      const isPM = t.includes("PM");
+                      return isPM && h !== 12 ? h + 12 : !isPM && h === 12 ? 0 : h;
+                    };
+
+                    const filteredApi = apiAppts.filter((a) => parseHour(a.startTime) === hour);
+                    const filteredPhp = phpAppts.filter((a) => parseHour(a.startTime) === hour);
+
                     return (
                       <div key={`${day.toISOString()}-${hour}`} className="border-b border-l p-1 min-h-[50px]">
-                        {dayAppts.map((appt) => {
+                        {filteredApi.map((appt) => {
                           const service = services?.find((s) => s.id === appt.serviceId);
                           const client = clients?.find((c) => c.id === appt.clientId);
                           return (
@@ -171,6 +213,15 @@ function CalendarContent() {
                             </div>
                           );
                         })}
+                        {filteredPhp.map((appt) => (
+                          <div
+                            key={appt.id}
+                            className="text-xs p-1 rounded bg-primary/10 text-foreground mb-1 truncate"
+                            title={`${appt.firstName} ${appt.lastName} - ${appt.serviceName}`}
+                          >
+                            {appt.firstName} - {appt.serviceName?.substring(0, 10)}
+                          </div>
+                        ))}
                       </div>
                     );
                   })}
@@ -180,71 +231,133 @@ function CalendarContent() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {getAppointmentsForDay(currentDate).length === 0 ? (
-              <div className="text-center py-16">
-                <Clock className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
-                <p className="text-muted-foreground">No appointments for this day</p>
-              </div>
-            ) : (
-              getAppointmentsForDay(currentDate).map((appt) => {
-                const service = services?.find((s) => s.id === appt.serviceId);
-                const client = clients?.find((c) => c.id === appt.clientId);
+            {(() => {
+              const { apiAppts, phpAppts } = getAppointmentsForDay(currentDate);
+              const hasAny = apiAppts.length > 0 || phpAppts.length > 0;
+              if (!hasAny) {
                 return (
-                  <Card key={appt.id} className="p-4" data-testid={`appt-${appt.id}`}>
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {client ? `${client.firstName} ${client.lastName}` : "Unknown"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {service?.name} | {appt.startTime} - {appt.endTime}
-                        </p>
-                        {appt.notes && <p className="text-xs text-muted-foreground mt-1">{appt.notes}</p>}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={
-                          appt.status === "confirmed" ? "default" :
-                          appt.status === "completed" ? "secondary" :
-                          appt.status === "cancelled" ? "destructive" : "outline"
-                        }>
-                          {appt.status}
-                        </Badge>
-                        {appt.status === "pending" && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => updateStatusMutation.mutate({ id: appt.id, status: "confirmed" })}
-                              data-testid={`button-confirm-${appt.id}`}
-                            >
-                              <Check className="w-4 h-4 text-green-600" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => updateStatusMutation.mutate({ id: appt.id, status: "cancelled" })}
-                              data-testid={`button-cancel-${appt.id}`}
-                            >
-                              <X className="w-4 h-4 text-destructive" />
-                            </Button>
-                          </>
-                        )}
-                        {appt.status === "confirmed" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateStatusMutation.mutate({ id: appt.id, status: "completed" })}
-                            data-testid={`button-complete-${appt.id}`}
-                          >
-                            Complete
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
+                  <div className="text-center py-16">
+                    <Clock className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
+                    <p className="text-muted-foreground">No appointments for this day</p>
+                  </div>
                 );
-              })
-            )}
+              }
+              return (
+                <>
+                  {apiAppts.map((appt) => {
+                    const service = services?.find((s) => s.id === appt.serviceId);
+                    const client = clients?.find((c) => c.id === appt.clientId);
+                    return (
+                      <Card key={appt.id} className="p-4" data-testid={`appt-${appt.id}`}>
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div>
+                            <p className="font-medium text-foreground">
+                              {client ? `${client.firstName} ${client.lastName}` : "Unknown"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {service?.name} | {appt.startTime} - {appt.endTime}
+                            </p>
+                            {appt.notes && <p className="text-xs text-muted-foreground mt-1">{appt.notes}</p>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={
+                              appt.status === "confirmed" ? "default" :
+                              appt.status === "completed" ? "secondary" :
+                              appt.status === "cancelled" ? "destructive" : "outline"
+                            }>
+                              {appt.status}
+                            </Badge>
+                            {appt.status === "pending" && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => updateStatusMutation.mutate({ id: appt.id, status: "confirmed" })}
+                                  data-testid={`button-confirm-${appt.id}`}
+                                >
+                                  <Check className="w-4 h-4 text-green-600" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => updateStatusMutation.mutate({ id: appt.id, status: "cancelled" })}
+                                  data-testid={`button-cancel-${appt.id}`}
+                                >
+                                  <X className="w-4 h-4 text-destructive" />
+                                </Button>
+                              </>
+                            )}
+                            {appt.status === "confirmed" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateStatusMutation.mutate({ id: appt.id, status: "completed" })}
+                                data-testid={`button-complete-${appt.id}`}
+                              >
+                                Complete
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                  {phpAppts.map((appt) => (
+                    <Card key={appt.id} className="p-4" data-testid={`appt-${appt.id}`}>
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <p className="font-medium text-foreground">
+                            {appt.firstName} {appt.lastName}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {appt.serviceName} | {appt.startTime}
+                          </p>
+                          {appt.email && <p className="text-xs text-muted-foreground mt-0.5">Email: {appt.email}</p>}
+                          {appt.phone && <p className="text-xs text-muted-foreground">Phone: {appt.phone}</p>}
+                          {appt.notes && <p className="text-xs text-muted-foreground mt-1">{appt.notes}</p>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={
+                            appt.status === "confirmed" ? "default" :
+                            appt.status === "completed" ? "secondary" :
+                            appt.status === "cancelled" ? "destructive" : "outline"
+                          }>
+                            {appt.status}
+                          </Badge>
+                          {appt.status === "pending" && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleStatusUpdate(appt.id, "confirmed")}
+                              >
+                                <Check className="w-4 h-4 text-green-600" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleStatusUpdate(appt.id, "cancelled")}
+                              >
+                                <X className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
+                          {appt.status === "confirmed" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleStatusUpdate(appt.id, "completed")}
+                            >
+                              Complete
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </>
+              );
+            })()}
           </div>
         )}
       </main>

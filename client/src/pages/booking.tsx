@@ -13,6 +13,9 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Clock, Check } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { bookAppointment } from "@/lib/appointment-storage";
+import { addAdminNotification } from "@/lib/prayer-storage";
+import { logVisitorAction } from "@/lib/activity-logger";
 import type { Service } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -41,12 +44,46 @@ export default function Booking() {
 
   const bookMutation = useMutation({
     mutationFn: async () => {
+      const serviceName = selected?.name || "Unknown Service";
+      const dateStr = selectedDate ? format(selectedDate, "yyyy-MM-dd") : "";
+
+      // Try original API first (works when real backend is running)
       const res = await apiRequest("POST", "/api/appointments/book", {
         serviceId: selectedService,
-        date: selectedDate ? format(selectedDate, "yyyy-MM-dd") : "",
+        date: dateStr,
         startTime: selectedTime,
         ...formData,
       });
+
+      // Also save to PHP backend so admin can see on any device
+      await bookAppointment({
+        serviceId: selectedService,
+        serviceName,
+        date: dateStr,
+        startTime: selectedTime,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        notes: formData.notes,
+      });
+
+      // Add admin notification
+      addAdminNotification({
+        type: "appointment",
+        title: `New booking: ${formData.firstName} ${formData.lastName}`,
+        message: `${serviceName} on ${selectedDate ? format(selectedDate, "MMMM d, yyyy") : dateStr} at ${selectedTime}`,
+      });
+
+      // Log the booking action
+      logVisitorAction("appointment_booked", {
+        service: serviceName,
+        date: dateStr,
+        time: selectedTime,
+        name: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+      }, "booking");
+
       return res.json();
     },
     onSuccess: () => {
@@ -134,13 +171,13 @@ export default function Booking() {
             <h2 className="font-serif text-xl text-foreground mb-4">Choose a Service</h2>
             {isLoading ? (
               <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
+                {Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-20 rounded-md" />
                 ))}
               </div>
             ) : (
               <div className="space-y-3">
-                {services?.filter(s => s.isActive).map((service) => (
+                {services?.filter(s => s.isActive && ["Shampoo & Blowdry", "Signature Haircut & Style", "Full Color Treatment"].includes(s.name)).map((service) => (
                   <Card
                     key={service.id}
                     className={`p-4 cursor-pointer hover-elevate ${

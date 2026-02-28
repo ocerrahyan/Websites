@@ -92,75 +92,39 @@ export function ChatWidget() {
     <div className="fixed bottom-6 right-6 z-50">
       <Card className="w-80 sm:w-96 flex flex-col shadow-xl" style={{ height: "28rem" }}>
         <div className="flex items-center justify-between gap-2 p-3 border-b">
-          <h3 className="font-serif text-sm font-medium text-foreground">Chat with Alis'</h3>
+          <h3 className="font-serif text-sm font-medium text-foreground">Contact Alis'</h3>
           <Button size="icon" variant="ghost" onClick={() => setIsOpen(false)} data-testid="button-close-chat">
             <X className="w-4 h-4" />
           </Button>
         </div>
 
-        {!nameSet ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-4 gap-3">
-            <MessageCircle className="w-10 h-10 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground text-center">Enter your name to start chatting</p>
-            <Input
-              placeholder="Your name"
-              value={senderName}
-              onChange={(e) => setSenderName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSetName()}
-              data-testid="input-chat-name"
-            />
-            <Button className="w-full" onClick={handleSetName} disabled={!senderName.trim()} data-testid="button-start-chat">
-              Start Chat
-            </Button>
-          </div>
-        ) : (
-          <>
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
-              {!messages || messages.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-xs text-muted-foreground">Send a message to start the conversation</p>
-                </div>
-              ) : (
-                messages.map((msg) => {
-                  const isAdmin = msg.senderType === "admin";
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex flex-col ${isAdmin ? "items-start" : "items-end"}`}
-                      data-testid={`chat-message-${msg.id}`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-md px-3 py-2 ${
-                          isAdmin ? "bg-muted text-foreground" : "bg-primary text-primary-foreground"
-                        }`}
-                      >
-                        <p className="text-xs font-medium mb-0.5 opacity-70">{msg.senderName}</p>
-                        <p className="text-sm">{msg.content}</p>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground mt-0.5 px-1">
-                        {formatTime(msg.createdAt)}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            <div className="p-3 border-t flex items-center gap-2">
-              <Input
-                placeholder="Type a message..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                data-testid="input-chat-message"
-              />
-              <Button size="icon" onClick={handleSend} disabled={!message.trim() || sendMutation.isPending} data-testid="button-send-chat">
-                <Send className="w-4 h-4" />
+        <div className="flex-1 flex flex-col items-center justify-center p-6 gap-4 text-center">
+          <MessageCircle className="w-12 h-12 text-primary" />
+          <h4 className="font-serif text-lg text-foreground">We'd love to hear from you!</h4>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            For appointments, questions, or just to say hello — reach out to Alis' directly.
+          </p>
+          <div className="space-y-3 w-full">
+            <a href="tel:+1234567890" className="block">
+              <Button variant="outline" className="w-full" data-testid="button-call">
+                📞 Call the Salon
               </Button>
-            </div>
-          </>
-        )}
+            </a>
+            <a href="mailto:ocerrahyan@alissimplyelegant.com" className="block">
+              <Button variant="outline" className="w-full" data-testid="button-email">
+                ✉️ Send an Email
+              </Button>
+            </a>
+            <a href="/booking" className="block">
+              <Button className="w-full" data-testid="button-book-now">
+                📅 Book an Appointment
+              </Button>
+            </a>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Live chat coming soon!
+          </p>
+        </div>
       </Card>
     </div>
   );

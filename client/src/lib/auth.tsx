@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { logAdminAction } from "./activity-logger";
 
 interface AuthContextType {
   isAdmin: boolean;
@@ -14,14 +15,33 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 });
 
+// Admin accounts for static/demo hosting fallback
+const STATIC_ADMINS = [
+  { username: "osheenadmin", password: "Turbohyetrident1!" },
+  { username: "Alisadmin", password: "Guluzar19821!" },
+];
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Check localStorage for static admin session
+    const staticSession = localStorage.getItem("alis-admin-session");
+    if (staticSession === "true") {
+      setIsAdmin(true);
+      setIsLoading(false);
+      return;
+    }
+
     fetch("/api/admin/session", { credentials: "include" })
       .then((res) => {
-        if (res.ok) return res.json();
+        if (res.ok) {
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            return res.json();
+          }
+        }
         return { authenticated: false };
       })
       .then((data) => setIsAdmin(data.authenticated))
@@ -38,17 +58,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         credentials: "include",
       });
       if (res.ok) {
-        setIsAdmin(true);
-        return true;
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const data = await res.json();
+          if (data.authenticated) {
+            setIsAdmin(true);
+            return true;
+          }
+        }
       }
-      return false;
     } catch {
-      return false;
+      // API unavailable — fall through to static check
     }
+
+    // Fallback: static credential check for demo/static hosting
+    const match = STATIC_ADMINS.find(
+      (a) => a.username.toLowerCase() === username.toLowerCase() && a.password === password
+    );
+    if (match) {
+      localStorage.setItem("alis-admin-session", "true");
+      localStorage.setItem("alis-admin-username", match.username);
+      setIsAdmin(true);
+      logAdminAction(match.username, "admin_login", { username: match.username }, "auth");
+      return true;
+    }
+
+    logAdminAction(username, "admin_login_failed", { username }, "auth");
+    return false;
   };
 
   const logout = async () => {
-    await fetch("/api/admin/logout", { method: "POST", credentials: "include" });
+    const adminUser = localStorage.getItem("alis-admin-username") || "unknown-admin";
+    logAdminAction(adminUser, "admin_logout", undefined, "auth");
+    try {
+      await fetch("/api/admin/logout", { method: "POST", credentials: "include" });
+    } catch {
+      // ignore on static hosting
+    }
+    localStorage.removeItem("alis-admin-session");
+    localStorage.removeItem("alis-admin-username");
     setIsAdmin(false);
   };
 

@@ -1,0 +1,15 @@
+RewriteEngine On
+RewriteBase /
+
+# Allow PHP API files to execute
+RewriteRule ^api/.*\.php$ - [L]
+
+# Do not rewrite API routes
+RewriteRule ^api/ - [L]
+
+# If the request is for an existing file or directory, serve it directly
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Otherwise, serve index.html (SPA fallback)
+RewriteRule ^ index.html [L]

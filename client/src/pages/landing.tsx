@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Calendar, Clock, Sparkles, Star, ShoppingBag, ArrowRight, Phone, Mail, MapPin, Menu, X, Palette } from "lucide-react";
+import { Calendar, Clock, Sparkles, Star, ShoppingBag, ArrowRight, Phone, Mail, MapPin, Menu, X, Palette, User, Video, Heart } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Service, Product, Painting } from "@shared/schema";
+import { useClientAuth } from "@/lib/client-auth";
+import { SocialLinks } from "@/components/social-share";
 
 function FaceSilhouette({ className = "" }: { className?: string }) {
   return (
@@ -93,7 +95,7 @@ function HeroSection() {
             </Link>
             <Link href="/membership">
               <Button size="lg" variant="outline" className="text-white border-white/30 bg-white/10 backdrop-blur-sm" data-testid="button-join-membership">
-                Join Membership
+                Join Community
               </Button>
             </Link>
           </div>
@@ -234,33 +236,9 @@ function FeaturedProductsSection() {
   );
 }
 
-function MembershipSection() {
-  const tiers = [
-    {
-      name: "Bronze",
-      color: "bg-amber-700/10 dark:bg-amber-700/20",
-      features: ["Priority booking", "Birthday special", "Exclusive updates"],
-    },
-    {
-      name: "Silver",
-      color: "bg-gray-300/20 dark:bg-gray-400/10",
-      features: ["10% off all services", "Free consultations", "Early product access", "Monthly newsletter"],
-      popular: true,
-    },
-    {
-      name: "Gold",
-      color: "bg-yellow-500/10 dark:bg-yellow-500/15",
-      features: ["20% off all services", "Free monthly treatment", "VIP scheduling", "Product samples", "Referral rewards"],
-    },
-    {
-      name: "Platinum",
-      color: "bg-purple-500/10 dark:bg-purple-400/15",
-      features: ["30% off everything", "Unlimited consultations", "Personal stylist", "Premium gift box", "Exclusive events", "Priority everything"],
-    },
-  ];
-
+function CommunitySection() {
   return (
-    <section className="py-20 px-6 bg-background" id="membership">
+    <section className="py-20 px-6 bg-background" id="community">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -269,43 +247,49 @@ function MembershipSection() {
           className="text-center mb-14"
         >
           <p className="text-primary text-sm tracking-[0.2em] uppercase mb-2 font-sans">Join the Family</p>
-          <h2 className="font-serif text-3xl md:text-4xl text-foreground">Membership Tiers</h2>
+          <h2 className="font-serif text-3xl md:text-4xl text-foreground">Community</h2>
         </motion.div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {tiers.map((tier, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl mx-auto">
+          {[
+            {
+              icon: Heart,
+              title: "Prayer Requests",
+              desc: "Share what's on your heart. Alis will hold you in her prayers with genuine care and love.",
+            },
+            {
+              icon: Sparkles,
+              title: "Inspirational Messages",
+              desc: "Subscribe to receive uplifting, faith-based messages from Alis — daily or weekly.",
+            },
+            {
+              icon: Mail,
+              title: "Special Comments",
+              desc: "Send a personal message, encouragement, or special comment directly to Alis.",
+            },
+          ].map((item, i) => (
             <motion.div
-              key={tier.name}
+              key={item.title}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
             >
-              <Card className={`p-5 relative overflow-visible hover-elevate ${tier.popular ? "border-primary" : ""}`} data-testid={`card-tier-${tier.name.toLowerCase()}`}>
-                {tier.popular && (
-                  <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2">
-                    Most Popular
-                  </Badge>
-                )}
-                <div className={`w-10 h-10 rounded-md ${tier.color} flex items-center justify-center mb-3`}>
-                  <Star className="w-5 h-5 text-foreground" />
+              <Card className="p-5 text-center hover-elevate h-full">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                  <item.icon className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="font-serif text-xl text-foreground mb-3">{tier.name}</h3>
-                <ul className="space-y-2">
-                  {tier.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Sparkles className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <Link href="/membership">
-                  <Button variant={tier.popular ? "default" : "outline"} className="w-full mt-5" data-testid={`button-join-${tier.name.toLowerCase()}`}>
-                    Join {tier.name}
-                  </Button>
-                </Link>
+                <h3 className="font-serif text-lg text-foreground mb-2">{item.title}</h3>
+                <p className="text-sm text-muted-foreground mb-4">{item.desc}</p>
               </Card>
             </motion.div>
           ))}
+        </div>
+        <div className="text-center mt-10">
+          <Link href="/membership">
+            <Button data-testid="button-join-community">
+              Join Our Community <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
+          </Link>
         </div>
       </div>
     </section>
@@ -475,15 +459,23 @@ function ContactSection() {
 function Footer() {
   return (
     <footer className="py-10 px-6 bg-card border-t">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto flex flex-col items-center gap-6">
         <div className="flex items-center gap-2">
           <FaceSilhouette className="w-6 h-auto text-primary" />
           <span className="font-serif text-xl text-foreground">Alis'</span>
         </div>
-        <p className="text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} Alis' Salon. All rights reserved.
-        </p>
+        <SocialLinks />
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+          <Link href="/reviews" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Reviews</Link>
+          <Link href="/waitlist" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Waitlist</Link>
+          <Link href="/tip" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Leave a Tip</Link>
+          <Link href="/style-board" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Style Board</Link>
+          <Link href="/portal/prayer-requests" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Prayer Request</Link>
+        </div>
         <div className="flex items-center gap-4">
+          <p className="text-sm text-muted-foreground">
+            &copy; {new Date().getFullYear()} Alis' Salon. All rights reserved.
+          </p>
           <Link href="/admin" className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-admin">
             Admin
           </Link>
@@ -498,14 +490,15 @@ const navItems = [
   { label: "Shop", href: "/shop" },
   { label: "Books", href: "/books" },
   { label: "Paintings", href: "/paintings" },
-  { label: "Membership", href: "/membership" },
-  { label: "Subscribe", href: "/subscribe" },
+  { label: "Community", href: "/membership" },
+  { label: "Virtual Consult", href: "/virtual-consultation" },
   { label: "Book Now", href: "/booking" },
 ];
 
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isAuthenticated, client } = useClientAuth();
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 50);
@@ -547,6 +540,12 @@ function Navbar() {
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
+          <Link href={isAuthenticated ? "/portal" : "/client/login"} className="hidden sm:block">
+            <Button size="sm" variant="outline" data-testid="button-nav-account">
+              <User className="w-3.5 h-3.5 mr-1.5" />
+              {isAuthenticated ? client?.firstName : "Sign In"}
+            </Button>
+          </Link>
           <Link href="/booking" className="hidden sm:block">
             <Button size="sm" data-testid="button-nav-book">
               <Calendar className="w-3.5 h-3.5 mr-1.5" /> Book
@@ -577,6 +576,13 @@ function Navbar() {
                 {item.label}
               </Link>
             ))}
+            <Link
+              href={isAuthenticated ? "/portal" : "/client/login"}
+              className="text-sm font-medium text-primary hover:text-foreground py-3 border-b border-border/50 transition-colors"
+              onClick={() => setMobileOpen(false)}
+            >
+              {isAuthenticated ? `My Account (${client?.firstName})` : "Sign In / Register"}
+            </Link>
           </div>
         </div>
       )}
@@ -593,7 +599,7 @@ export default function Landing() {
       <AboutSection />
       <PaintingsSection />
       <FeaturedProductsSection />
-      <MembershipSection />
+      <CommunitySection />
       <ContactSection />
       <Footer />
     </div>

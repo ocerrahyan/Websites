@@ -4,126 +4,100 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Star, Sparkles, Check, Crown } from "lucide-react";
+import {
+  ArrowLeft, Heart, Mail, MessageCircle, HandHeart, Lock, ShieldCheck, Church, Sparkles, BookOpen, Check,
+} from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-
-const tiers = [
-  {
-    id: "bronze",
-    name: "Bronze",
-    color: "from-amber-700/20 to-amber-600/10",
-    icon: Star,
-    features: [
-      "Priority booking",
-      "Birthday special offer",
-      "Exclusive updates via email",
-      "Member-only content",
-    ],
-  },
-  {
-    id: "silver",
-    name: "Silver",
-    color: "from-gray-400/20 to-gray-300/10",
-    icon: Sparkles,
-    popular: true,
-    features: [
-      "Everything in Bronze",
-      "10% off all services",
-      "Free consultations",
-      "Early access to products",
-      "Monthly beauty newsletter",
-    ],
-  },
-  {
-    id: "gold",
-    name: "Gold",
-    color: "from-yellow-500/20 to-yellow-400/10",
-    icon: Crown,
-    features: [
-      "Everything in Silver",
-      "20% off all services",
-      "Free monthly mini-treatment",
-      "VIP scheduling priority",
-      "Seasonal product samples",
-      "Referral rewards program",
-    ],
-  },
-  {
-    id: "platinum",
-    name: "Platinum",
-    color: "from-purple-500/20 to-purple-400/10",
-    icon: Crown,
-    features: [
-      "Everything in Gold",
-      "30% off everything",
-      "Unlimited consultations",
-      "Personal styling sessions",
-      "Premium quarterly gift box",
-      "Exclusive member events",
-      "Priority on all services",
-    ],
-  },
-];
+import { apiRequest } from "@/lib/queryClient";
+import { saveAdminPrayerRequest } from "@/lib/prayer-storage";
+import { logVisitorAction } from "@/lib/activity-logger";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 
 export default function Membership() {
-  const [selectedTier, setSelectedTier] = useState<string | null>(null);
-  const [showSignup, setShowSignup] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-  });
-  const [signupComplete, setSignupComplete] = useState(false);
   const { toast } = useToast();
 
-  const signupMutation = useMutation({
+  // Subscribe state
+  const [subFirstName, setSubFirstName] = useState("");
+  const [subLastName, setSubLastName] = useState("");
+  const [subEmail, setSubEmail] = useState("");
+  const [subPhone, setSubPhone] = useState("");
+  const [frequency, setFrequency] = useState("weekly");
+  const [channel, setChannel] = useState("email");
+  const [subSubmitted, setSubSubmitted] = useState(false);
+
+  // Prayer / comment state
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [content, setContent] = useState("");
+  const [prayerSubmitted, setPrayerSubmitted] = useState(false);
+
+  const subscribeMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/membership/signup", {
-        ...formData,
-        tier: selectedTier,
+      const res = await apiRequest("POST", "/api/subscribers", {
+        firstName: subFirstName,
+        lastName: subLastName,
+        email: subEmail,
+        phone: subPhone || null,
+        frequency,
+        channel,
+        isActive: true,
       });
       return res.json();
     },
     onSuccess: () => {
-      setSignupComplete(true);
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-    },
-    onError: (error: any) => {
+      setSubSubmitted(true);
       toast({
-        title: "Sign Up Failed",
-        description: error.message || "Something went wrong.",
+        title: "Welcome!",
+        description: "You've been subscribed to inspirational messages from Alis'.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Oops",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  if (signupComplete) {
-    const tier = tiers.find((t) => t.id === selectedTier);
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-          <Card className="max-w-md w-full p-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
-              <Check className="w-8 h-8 text-green-600 dark:text-green-400" />
-            </div>
-            <h1 className="font-serif text-2xl text-foreground mb-2">Welcome to the Family!</h1>
-            <p className="text-muted-foreground mb-6">
-              You're now a <span className="font-medium text-foreground">{tier?.name}</span> member at Alis'.
-              We can't wait to take care of you.
-            </p>
-            <Link href="/booking">
-              <Button className="w-full" data-testid="button-book-first">Book Your First Appointment</Button>
-            </Link>
-          </Card>
-        </motion.div>
-      </div>
-    );
-  }
+  const prayerMutation = useMutation({
+    mutationFn: async () => {
+      await saveAdminPrayerRequest({ name, email, phone, content });
+      logVisitorAction("prayer_request_submitted", { name, hasEmail: !!email }, "prayer");
+      return { ok: true };
+    },
+    onSuccess: () => {
+      setPrayerSubmitted(true);
+      toast({
+        title: "Request Received",
+        description: "Your message has been received. Alis will keep you in her prayers.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Something went wrong",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -143,131 +117,248 @@ export default function Membership() {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-          <p className="text-primary text-sm tracking-[0.2em] uppercase mb-2">Exclusive Access</p>
-          <h1 className="font-serif text-3xl md:text-4xl text-foreground mb-3">Membership Plans</h1>
-          <p className="text-muted-foreground max-w-lg mx-auto">
-            Join the Alis' family and unlock exclusive benefits, priority booking, and special discounts on all our services and products.
-          </p>
-        </motion.div>
-
-        {!showSignup ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
-            {tiers.map((tier, i) => (
-              <motion.div
-                key={tier.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-              >
-                <Card
-                  className={`p-5 relative overflow-visible hover-elevate cursor-pointer ${
-                    selectedTier === tier.id ? "border-primary" : ""
-                  } ${tier.popular ? "border-primary" : ""}`}
-                  onClick={() => setSelectedTier(tier.id)}
-                  data-testid={`card-tier-${tier.id}`}
-                >
-                  {tier.popular && (
-                    <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2">
-                      Most Popular
-                    </Badge>
-                  )}
-                  <div className={`w-10 h-10 rounded-md bg-gradient-to-br ${tier.color} flex items-center justify-center mb-3`}>
-                    <tier.icon className="w-5 h-5 text-foreground" />
-                  </div>
-                  <h3 className="font-serif text-xl text-foreground mb-3">{tier.name}</h3>
-                  <ul className="space-y-2 mb-5">
-                    {tier.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2 text-sm text-muted-foreground">
-                        <Check className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    variant={selectedTier === tier.id ? "default" : "outline"}
-                    className="w-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedTier(tier.id);
-                      setShowSignup(true);
-                    }}
-                    data-testid={`button-select-${tier.id}`}
-                  >
-                    {selectedTier === tier.id ? "Selected" : "Choose Plan"}
-                  </Button>
-                </Card>
-              </motion.div>
-            ))}
+      <div className="relative h-48 overflow-hidden bg-gradient-to-r from-primary/20 via-primary/10 to-background">
+        <div className="absolute inset-0 flex items-center px-6">
+          <div className="max-w-7xl mx-auto w-full">
+            <p className="text-primary text-sm tracking-[0.2em] uppercase mb-1 font-sans">Join the Family</p>
+            <h1 className="font-serif text-3xl md:text-4xl text-foreground">Community</h1>
+            <p className="text-muted-foreground mt-2 max-w-xl">
+              Connect with Alis through prayer requests, special messages, and inspirational content.
+            </p>
           </div>
-        ) : (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-md mx-auto">
-            <Card className="p-6">
-              <h2 className="font-serif text-xl text-foreground mb-1">
-                Sign Up for {tiers.find((t) => t.id === selectedTier)?.name}
-              </h2>
-              <p className="text-sm text-muted-foreground mb-5">
-                Contact Alis' for pricing details
-              </p>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-1.5 block">First Name</label>
-                    <Input
-                      value={formData.firstName}
-                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                      placeholder="First name"
-                      data-testid="input-first-name"
-                    />
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-6 py-10">
+        {/* Feature highlights */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+          {[
+            { icon: HandHeart, title: "Prayer Requests", desc: "Share what's on your heart" },
+            { icon: Sparkles, title: "Inspirational Messages", desc: "Receive uplifting words from Alis" },
+            { icon: Church, title: "Spiritual Community", desc: "Connect through faith and encouragement" },
+          ].map((item, i) => (
+            <motion.div key={item.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
+              <Card className="p-4 text-center hover-elevate">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                  <item.icon className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="font-medium text-foreground text-sm mb-1">{item.title}</h3>
+                <p className="text-xs text-muted-foreground">{item.desc}</p>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+
+        <Tabs defaultValue="prayer" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="prayer" className="gap-2">
+              <Heart className="w-4 h-4" /> Prayer & Comments
+            </TabsTrigger>
+            <TabsTrigger value="subscribe" className="gap-2">
+              <Mail className="w-4 h-4" /> Subscribe
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="prayer">
+            <div className="grid md:grid-cols-2 gap-8 items-start">
+              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
+                <h2 className="font-serif text-2xl text-foreground mb-3">Prayer Requests & Special Comments</h2>
+                <p className="text-muted-foreground mb-6 leading-relaxed">
+                  Alis deeply cares about the spiritual wellbeing of every person who connects with her.
+                  If you have something on your heart — a prayer request, a special comment, or words
+                  of encouragement — she would be honored to receive them.
+                </p>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Lock className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-foreground text-sm">Completely Private</h3>
+                      <p className="text-muted-foreground text-sm">Your messages are seen only by Alis</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-1.5 block">Last Name</label>
-                    <Input
-                      value={formData.lastName}
-                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                      placeholder="Last name"
-                      data-testid="input-last-name"
-                    />
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <HandHeart className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-foreground text-sm">Prayed Over Personally</h3>
+                      <p className="text-muted-foreground text-sm">Every request is read and prayed over with genuine care</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <ShieldCheck className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-foreground text-sm">Safe & Confidential</h3>
+                      <p className="text-muted-foreground text-sm">Share as much or as little as you feel comfortable with</p>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Email</label>
-                  <Input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="you@email.com"
-                    data-testid="input-email"
-                  />
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.2 }}>
+                {prayerSubmitted ? (
+                  <Card className="p-8 text-center">
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                      <Heart className="w-8 h-8 text-primary" />
+                    </div>
+                    <h3 className="font-serif text-2xl text-foreground mb-2">Thank You</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Your message has been received with love and care.
+                      Alis will hold you in her prayers. You are never alone.
+                    </p>
+                    <Button onClick={() => { setPrayerSubmitted(false); setName(""); setEmail(""); setPhone(""); setContent(""); }}>
+                      Send Another Message
+                    </Button>
+                  </Card>
+                ) : (
+                  <Card className="p-6">
+                    <h3 className="font-serif text-xl text-foreground mb-5">Share Your Request</h3>
+                    <form onSubmit={(e) => { e.preventDefault(); prayerMutation.mutate(); }} className="space-y-4">
+                      <div>
+                        <Label htmlFor="pr-name" className="text-sm">Name</Label>
+                        <Input id="pr-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" required data-testid="input-name" />
+                      </div>
+                      <div>
+                        <Label htmlFor="pr-email" className="text-sm">Email (optional)</Label>
+                        <Input id="pr-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" data-testid="input-email" />
+                      </div>
+                      <div>
+                        <Label htmlFor="pr-phone" className="text-sm">Phone (optional)</Label>
+                        <Input id="pr-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" data-testid="input-phone" />
+                      </div>
+                      <div>
+                        <Label htmlFor="pr-content" className="text-sm">Prayer Request or Comment</Label>
+                        <Textarea id="pr-content" value={content} onChange={(e) => setContent(e.target.value)} placeholder="Share what's on your heart..." rows={5} required data-testid="input-prayer-content" />
+                      </div>
+                      <Button type="submit" className="w-full" disabled={!name || !content || prayerMutation.isPending} data-testid="button-submit-prayer">
+                        {prayerMutation.isPending ? "Sending..." : "Submit Request"}
+                      </Button>
+                    </form>
+                  </Card>
+                )}
+              </motion.div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="subscribe">
+            <div className="grid md:grid-cols-2 gap-8 items-start">
+              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
+                <h2 className="font-serif text-2xl text-foreground mb-3">Messages from Alis'</h2>
+                <p className="text-muted-foreground mb-6 leading-relaxed">
+                  Subscribe to receive heartfelt, inspirational messages from Alis Cerrahyan.
+                  Drawing from 45+ years of wisdom, her published books, and spiritual insights,
+                  each message is designed to uplift and inspire you.
+                </p>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-foreground text-sm">Daily or Weekly Inspiration</h3>
+                      <p className="text-muted-foreground text-sm">Choose how often you'd like to hear from Alis'</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <BookOpen className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-foreground text-sm">Wisdom from Her Books</h3>
+                      <p className="text-muted-foreground text-sm">Insights from "Behind the Chair" and more</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Church className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-foreground text-sm">Gospel & Spiritual Messages</h3>
+                      <p className="text-muted-foreground text-sm">Uplifting spiritual content to nourish your soul</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">Phone</label>
-                  <Input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="(555) 123-4567"
-                    data-testid="input-phone"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 mt-6">
-                <Button variant="outline" onClick={() => setShowSignup(false)} data-testid="button-back-tiers">
-                  Back
-                </Button>
-                <Button
-                  className="flex-1"
-                  disabled={!formData.firstName || !formData.lastName || !formData.email || signupMutation.isPending}
-                  onClick={() => signupMutation.mutate()}
-                  data-testid="button-signup"
-                >
-                  {signupMutation.isPending ? "Signing up..." : "Join Now"}
-                </Button>
-              </div>
-            </Card>
-          </motion.div>
-        )}
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.2 }}>
+                {subSubmitted ? (
+                  <Card className="p-8 text-center">
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                      <Check className="w-8 h-8 text-primary" />
+                    </div>
+                    <h3 className="font-serif text-2xl text-foreground mb-2">You're In!</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Thank you for subscribing. You'll receive {frequency} inspirational messages from Alis'.
+                      Each message is crafted with love and over 45 years of wisdom.
+                    </p>
+                    <Link href="/">
+                      <Button><ArrowLeft className="w-4 h-4 mr-2" /> Back to Home</Button>
+                    </Link>
+                  </Card>
+                ) : (
+                  <Card className="p-6">
+                    <h3 className="font-serif text-xl text-foreground mb-5">Subscribe Now</h3>
+                    <form onSubmit={(e) => { e.preventDefault(); subscribeMutation.mutate(); }} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor="sub-firstName" className="text-sm">First Name</Label>
+                          <Input id="sub-firstName" value={subFirstName} onChange={(e) => setSubFirstName(e.target.value)} placeholder="First name" required data-testid="input-first-name" />
+                        </div>
+                        <div>
+                          <Label htmlFor="sub-lastName" className="text-sm">Last Name</Label>
+                          <Input id="sub-lastName" value={subLastName} onChange={(e) => setSubLastName(e.target.value)} placeholder="Last name" required data-testid="input-last-name" />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="sub-email" className="text-sm">Email Address</Label>
+                        <Input id="sub-email" type="email" value={subEmail} onChange={(e) => setSubEmail(e.target.value)} placeholder="you@example.com" required data-testid="input-email" />
+                      </div>
+                      <div>
+                        <Label htmlFor="sub-phone" className="text-sm">Phone (optional)</Label>
+                        <Input id="sub-phone" type="tel" value={subPhone} onChange={(e) => setSubPhone(e.target.value)} placeholder="(555) 123-4567" data-testid="input-phone" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-sm">Frequency</Label>
+                          <Select value={frequency} onValueChange={setFrequency}>
+                            <SelectTrigger data-testid="select-frequency"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="daily">Daily</SelectItem>
+                              <SelectItem value="weekly">Weekly</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm">Receive Via</Label>
+                          <Select value={channel} onValueChange={setChannel}>
+                            <SelectTrigger data-testid="select-channel"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="email">Email</SelectItem>
+                              <SelectItem value="sms">SMS</SelectItem>
+                              <SelectItem value="both">Both</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <Button type="submit" className="w-full" disabled={subscribeMutation.isPending} data-testid="button-subscribe">
+                        {subscribeMutation.isPending ? "Subscribing..." : (
+                          <><Heart className="w-4 h-4 mr-2" /> Subscribe to Messages</>
+                        )}
+                      </Button>
+                      <p className="text-xs text-muted-foreground text-center">
+                        You can unsubscribe at any time. We respect your privacy.
+                      </p>
+                    </form>
+                  </Card>
+                )}
+              </motion.div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

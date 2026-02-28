@@ -66,7 +66,7 @@ export default function Books() {
             <p className="text-muted-foreground">No books listed yet</p>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-10">
             {books.map((book, i) => (
               <motion.div
                 key={book.id}
@@ -76,12 +76,16 @@ export default function Books() {
               >
                 <Card className="overflow-visible hover-elevate" data-testid={`card-book-${book.id}`}>
                   <div className="flex flex-col sm:flex-row">
-                    <div className="w-full sm:w-56 shrink-0 overflow-hidden rounded-t-md sm:rounded-l-md sm:rounded-tr-none">
-                      <img
-                        src={book.coverImageUrl || "/images/book-placeholder.png"}
-                        alt={book.title}
-                        className="w-full h-full object-cover aspect-[3/4]"
-                      />
+                    <div className="w-full sm:w-64 shrink-0 p-4 sm:p-5 flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10 rounded-t-md sm:rounded-l-md sm:rounded-tr-none">
+                      <div className="relative group">
+                        <img
+                          src={book.coverImageUrl || "/images/book-placeholder.png"}
+                          alt={book.title}
+                          className="w-48 sm:w-52 rounded-sm shadow-xl transition-transform duration-500 group-hover:scale-105 group-hover:shadow-2xl"
+                          style={{ aspectRatio: "3/4", objectFit: "cover" }}
+                        />
+                        <div className="absolute inset-0 rounded-sm ring-1 ring-black/10" />
+                      </div>
                     </div>
                     <div className="p-5 flex-1 flex flex-col">
                       <div className="flex items-start justify-between gap-3 flex-wrap mb-2">

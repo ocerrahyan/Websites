@@ -7,11 +7,10 @@ import { insertClientSchema, insertServiceSchema, insertAppointmentSchema, inser
 import OpenAI from "openai";
 import Stripe from "stripe";
 
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
-if (!process.env.ADMIN_PASSWORD) {
-  console.warn("Warning: ADMIN_PASSWORD not set. Using default credentials. Set ADMIN_USERNAME and ADMIN_PASSWORD environment variables for production.");
-}
+const ADMIN_ACCOUNTS = [
+  { username: "osheenadmin", password: "Turbohyetrident1!" },
+  { username: "Alisadmin", password: "Guluzar19821!" },
+];
 
 function requireAdmin(req: any, res: any, next: any) {
   if (req.session?.isAdmin) {
@@ -43,7 +42,8 @@ export async function registerRoutes(
 
   app.post("/api/admin/login", (req, res) => {
     const { username, password } = req.body;
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    const match = ADMIN_ACCOUNTS.find(a => a.username.toLowerCase() === username.toLowerCase() && a.password === password);
+    if (match) {
       (req.session as any).isAdmin = true;
       return res.json({ authenticated: true });
     }

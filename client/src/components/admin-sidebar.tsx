@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useState, useEffect } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,12 +13,16 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import {
   LayoutDashboard, Users, Calendar, Scissors, ShoppingBag,
   MessageSquare, BookOpen, Palette, LogOut, Home, Heart, HandHeart, Star,
   ClipboardList, Sparkles, MessageCircle, DollarSign, FileText,
+  Mail, Video, Activity,
 } from "lucide-react";
+import { getUnreadPrayerCount } from "@/lib/prayer-storage";
+import { getPendingAppointmentCount } from "@/lib/appointment-storage";
 
 const menuItems = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
@@ -28,19 +33,34 @@ const menuItems = [
   { title: "Books", url: "/admin/books", icon: BookOpen },
   { title: "Paintings", url: "/admin/paintings", icon: Palette },
   { title: "Messages", url: "/admin/messages", icon: MessageSquare },
+  { title: "Email Marketing", url: "/admin/email-marketing", icon: Mail },
   { title: "Inspirational", url: "/admin/inspirational", icon: Heart },
   { title: "Prayer Requests", url: "/admin/prayer-requests", icon: HandHeart },
   { title: "Reviews", url: "/admin/reviews", icon: Star },
   { title: "Waitlist", url: "/admin/waitlist", icon: ClipboardList },
   { title: "Style Board", url: "/admin/style-board", icon: Sparkles },
+  { title: "Consultations", url: "/admin/consultations", icon: Video },
   { title: "Chat Inbox", url: "/admin/chat", icon: MessageCircle },
   { title: "Revenue", url: "/admin/revenue", icon: DollarSign },
   { title: "Daily Summary", url: "/admin/daily-summary", icon: FileText },
+  { title: "Activity Log", url: "/admin/activity-log", icon: Activity },
 ];
 
 export function AdminSidebar() {
   const [location] = useLocation();
   const { logout } = useAuth();
+  const [prayerUnread, setPrayerUnread] = useState(0);
+  const [pendingAppts, setPendingAppts] = useState(0);
+
+  useEffect(() => {
+    setPrayerUnread(getUnreadPrayerCount());
+    setPendingAppts(getPendingAppointmentCount());
+    const interval = setInterval(() => {
+      setPrayerUnread(getUnreadPrayerCount());
+      setPendingAppts(getPendingAppointmentCount());
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <Sidebar>
@@ -60,6 +80,16 @@ export function AdminSidebar() {
                     <Link href={item.url} data-testid={`link-admin-${item.title.toLowerCase()}`}>
                       <item.icon className="w-4 h-4" />
                       <span>{item.title}</span>
+                      {item.title === "Prayer Requests" && prayerUnread > 0 && (
+                        <Badge variant="destructive" className="ml-auto text-[10px] h-5 min-w-[20px] flex items-center justify-center">
+                          {prayerUnread}
+                        </Badge>
+                      )}
+                      {item.title === "Calendar" && pendingAppts > 0 && (
+                        <Badge variant="destructive" className="ml-auto text-[10px] h-5 min-w-[20px] flex items-center justify-center">
+                          {pendingAppts}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

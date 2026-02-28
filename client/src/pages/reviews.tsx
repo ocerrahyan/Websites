@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Star, Send, CheckCircle2 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { logVisitorAction } from "@/lib/activity-logger";
 import type { Review } from "@shared/schema";
 
 function ReviewsNavbar() {
@@ -131,6 +132,7 @@ export default function ReviewsPage() {
     onSuccess: () => {
       setFormSubmitted(true);
       queryClient.invalidateQueries({ queryKey: ["/api/reviews"] });
+      logVisitorAction("review_submitted", { name: reviewName, rating: reviewRating }, "review");
       toast({ title: "Review Submitted!", description: "Thank you! Your review will appear after approval." });
     },
     onError: (error: Error) => {

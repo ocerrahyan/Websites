@@ -66,8 +66,10 @@ export default function Services() {
     }
   };
 
-  const favoriteServices = services?.filter((s) => isFavorited(s.id)) || [];
-  const categories = services ? Array.from(new Set(services.map((s) => s.category))) : [];
+  // Only show Signature Haircut & Style and Full Color Treatment on the services page
+  const displayedServiceNames = ["Signature Haircut & Style", "Full Color Treatment"];
+  const displayedServices = services?.filter((s) => displayedServiceNames.includes(s.name)) || [];
+  const favoriteServices = displayedServices.filter((s) => isFavorited(s.id));
 
   const ServiceCard = ({ service, index }: { service: Service; index: number }) => (
     <motion.div
@@ -171,7 +173,7 @@ export default function Services() {
                 <h2 className="font-serif text-xl text-foreground mb-5 flex items-center gap-2">
                   <Heart className="w-5 h-5 fill-red-500 text-red-500" /> Your Favorites
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {favoriteServices.map((service, i) => (
                     <ServiceCard key={service.id} service={service} index={i} />
                   ))}
@@ -179,18 +181,11 @@ export default function Services() {
               </div>
             )}
 
-            {categories.map((category) => (
-              <div key={category} className="mb-12">
-                <h2 className="font-serif text-xl text-foreground mb-5 capitalize">{category}</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {services
-                    ?.filter((s) => s.category === category)
-                    .map((service, i) => (
-                      <ServiceCard key={service.id} service={service} index={i} />
-                    ))}
-                </div>
-              </div>
-            ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {displayedServices.map((service, i) => (
+                <ServiceCard key={service.id} service={service} index={i} />
+              ))}
+            </div>
           </>
         )}
       </div>
